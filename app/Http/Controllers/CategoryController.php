@@ -1,0 +1,104 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Requests\CategoryRequest;
+use App\Http\Resources\CategoryResource;
+use App\Interfaces\CategoryRepositoryInterface;
+use Illuminate\Http\Request;
+
+class CategoryController extends Controller
+{
+    private $categoryRepository;
+
+    public function __construct(CategoryRepositoryInterface $categoryRepositoryInterface)
+    {
+        $this->categoryRepository = $categoryRepositoryInterface;
+    }
+
+    public function index ()
+    {
+        try {
+            $categories = $this->categoryRepository->getAllCategories();
+            if ($categories->count() <= 0) {
+                return response()->json(['message' => 'No categories found'], 404);
+            }
+
+            return CategoryResource::collection($categories);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => 'An error occurred while retrieving the category',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+
+    }
+
+    public function show ($categoryId)
+    {
+        try {
+            $category = $this->categoryRepository->getCategoryById($categoryId);
+            if (!$category) {
+                return response()->json(['message' => 'Category not found'], 404);
+            }
+            return new CategoryResource($category);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => 'An error occurred while retrieving the category',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function store (CategoryRequest $categoryRequest)
+    {
+        try {
+            $category = $this->categoryRepository->createCategory($categoryRequest->validated());
+            return (new CategoryResource($category))
+                    ->additional(['message' => 'Category created successfully'])
+                    ->response()
+                    ->setStatusCode(201);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => 'An error occurred while creating the category',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+
+    }
+
+    public function update (CategoryRequest $categoryRequest, $categoryId)
+    {
+        try {
+            $category = $this->categoryRepository->updateCategory($categoryRequest->validated(), $categoryId);
+            if (!$category) {
+                return response()->json(['message' => 'Category not found'], 404);
+            }
+            return (new CategoryResource($category))
+                ->additional(['message' => 'Category updated successfully'])
+                ->response()
+                ->setStatusCode(201);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => 'An error occurred while updating the category',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+
+    }
+
+    public function destroy ($categoryId)
+    {
+        try {
+            $this->categoryRepository->deleteCategory($categoryId);
+            return response()->json(['message' => 'Category deleted successfully']);
+        } catch (\Exception $e) {
+            // Handle unexpected exceptions
+            return response()->json([
+                'message' => 'An error occurred while deleting the category',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+
+    }
+}
