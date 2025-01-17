@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class Category extends Model
 {
@@ -16,6 +17,11 @@ class Category extends Model
         'image',
     ];
 
+    protected $hidden = [
+        'created_at',
+        'updated_at',
+    ];
+
     public function products()
     {
         return $this->hasMany(Product::class);
@@ -24,5 +30,19 @@ class Category extends Model
     public function children()
     {
         return $this->hasMany(Category::class, 'parent_id');
+    }
+
+    public function parent()
+    {
+        return $this->belongsTo(Category::class, 'parent_id');
+    }
+
+    public function getImageUrlAttribute()
+    {
+        if ($this->image) {
+            return Storage::url('categories/' . $this->image);
+        }
+
+        return null;
     }
 }

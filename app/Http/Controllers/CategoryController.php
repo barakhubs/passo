@@ -58,6 +58,11 @@ class CategoryController extends Controller
                     ->additional(['message' => 'Category created successfully'])
                     ->response()
                     ->setStatusCode(201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
         } catch (\Throwable $th) {
             return response()->json([
                 'message' => 'An error occurred while creating the category',
@@ -70,26 +75,35 @@ class CategoryController extends Controller
     public function update (CategoryRequest $categoryRequest, $categoryId)
     {
         try {
-            $category = $this->categoryRepository->updateCategory($categoryRequest->validated(), $categoryId);
+            $category = $this->categoryRepository->getCategoryById($categoryId);
             if (!$category) {
                 return response()->json(['message' => 'Category not found'], 404);
             }
+            $category = $this->categoryRepository->updateCategory($categoryRequest->validated(), $categoryId);
             return (new CategoryResource($category))
                 ->additional(['message' => 'Category updated successfully'])
                 ->response()
                 ->setStatusCode(201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
         } catch (\Throwable $th) {
             return response()->json([
                 'message' => 'An error occurred while updating the category',
                 'error' => $th->getMessage(),
             ], 500);
         }
-
     }
 
     public function destroy ($categoryId)
     {
         try {
+            $category = $this->categoryRepository->getCategoryById($categoryId);
+            if (!$category) {
+                return response()->json(['message' => 'Category not found'], 404);
+            }
             $this->categoryRepository->deleteCategory($categoryId);
             return response()->json(['message' => 'Category deleted successfully']);
         } catch (\Exception $e) {

@@ -3,12 +3,14 @@
 namespace App\Providers;
 
 use App\Interfaces\CategoryRepositoryInterface;
+use App\Interfaces\ProductRepositoryInterface;
 use Illuminate\Support\ServiceProvider;
 
 class RepositoryServiceProvider extends ServiceProvider
 {
     protected $repositories = [
         CategoryRepositoryInterface::class => \App\Repositories\CategoryRepository::class,
+        ProductRepositoryInterface::class => \App\Repositories\ProductRepository::class,
     ];
 
     /**

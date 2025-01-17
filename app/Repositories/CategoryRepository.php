@@ -4,13 +4,19 @@ namespace App\Repositories;
 
 use App\Interfaces\CategoryRepositoryInterface;
 use App\Models\Category;
+use App\Services\FileUploadService;
+use App\Services\SlugCreatorService;
 
 class CategoryRepository implements CategoryRepositoryInterface
 {
     protected $model;
-    public function __construct(Category $category)
+    protected $fileUploadService;
+    protected $slugCreatorService;
+    public function __construct(Category $category, FileUploadService $fileUploadService, SlugCreatorService $slugCreatorService)
     {
         $this->model = $category;
+        $this->fileUploadService = $fileUploadService;
+        $this->slugCreatorService = $slugCreatorService;
     }
 
     public function getAllCategories()
@@ -25,14 +31,27 @@ class CategoryRepository implements CategoryRepositoryInterface
 
     public function createCategory($data)
     {
+        if (isset($data['image']) && asset($data['image'])) {
+            $data['image'] = $this->fileUploadService->uploadFile($data['image'], 'categories');
+        }
+
+        $data['slug'] = $this->slugCreatorService->createSlug($data['name']);
+
         return $this->model->create($data);
     }
 
-    public function updateCategory($id, $data): mixed
+    public function updateCategory($data, $id): mixed
     {
         $category = $this->getCategoryById($id);
         if ($category) {
+            if (isset($data['image']) && asset($data['image'])) {
+                $this->fileUploadService->updateFile($data['image'], 'categories', $category->image);
+            }
+
+            $data['slug'] = $this->slugCreatorService->createSlug($data['name']);
+
             $category->update($data);
+
             return $category;
         }
         return false;
@@ -42,6 +61,10 @@ class CategoryRepository implements CategoryRepositoryInterface
     {
         $category = $this->getCategoryById($id);
         if ($category) {
+            if ($category->image) {
+                $this->fileUploadService->deleteFile($category->image, 'categories');
+            }
+
             $category->delete();
             return true;
         }
