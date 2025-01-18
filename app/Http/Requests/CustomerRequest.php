@@ -33,4 +33,11 @@ class CustomerRequest extends FormRequest
 
         return $rules;
     }
+
+    public function attributes(): array
+    {
+        return [
+            'business_id' => 'business',
+        ];
+    }
 }

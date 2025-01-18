@@ -34,4 +34,12 @@ class CategoryRequest extends FormRequest
 
         return $rules;
     }
+
+    public function attributes(): array
+    {
+        return [
+            'parent_id' => 'parent category',
+            'business_id' => 'business',
+        ];
+    }
 }

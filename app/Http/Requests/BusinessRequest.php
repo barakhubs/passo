@@ -41,4 +41,11 @@ class BusinessRequest extends FormRequest
 
         return $rules;
     }
+
+    public function attributes(): array
+    {
+        return [
+            'user_id' => 'user',
+        ];
+    }
 }

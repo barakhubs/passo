@@ -18,6 +18,8 @@ class SaleResource extends JsonResource
             'id' => $this->id,
             'reference' => $this->reference,
             'customer' => $this->customer->first_name . ' ' . $this->customer->last_name,
+            'business' => $this->business->name,
+            'payment_status' => $this->payment_status,
             'total_amount' => $this->total_amount,
             'items' => SaleItemResource::collection($this->saleItems),
         ];

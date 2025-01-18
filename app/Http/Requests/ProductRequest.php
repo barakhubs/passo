@@ -39,4 +39,12 @@ class ProductRequest extends FormRequest
 
         return $rules;
     }
+
+    public function attributes(): array
+    {
+        return [
+            'category_id' => 'category',
+            'business_id' => 'business',
+        ];
+    }
 }

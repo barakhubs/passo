@@ -70,7 +70,7 @@ class SaleRequest extends FormRequest
                 if ($product && $product->stock_quantity < $item['quantity']) {
                     $validator->errors()->add(
                         "items.{$index}.quantity",
-                        "Insufficient stock for product {$product->name}. Available: {$product->stock}"
+                        "Insufficient stock for product {$product->name}. Available: {$product->stock_quantity} items"
                     );
                 }
             }
