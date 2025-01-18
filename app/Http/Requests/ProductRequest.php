@@ -24,6 +24,7 @@ class ProductRequest extends FormRequest
         $rules = [
             'name' => 'required|string|max:255',
             'category_id' => 'required|exists:categories,id',
+            'business_id' => 'required|exists:businesses,id',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
             'buying_price' => 'required|numeric',
             'selling_price' => 'required|numeric',

@@ -3,12 +3,13 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
-class CategoryRequest extends FormRequest
+class CustomerRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
+    // /**
+    //  * Determine if the user is authorized to make this request.
+    //  */
     // public function authorize(): bool
     // {
     //     return false;
@@ -22,15 +23,13 @@ class CategoryRequest extends FormRequest
     public function rules(): array
     {
         $rules = [
-            'name' => 'required|string|max:255',
-            'parent_id' => 'nullable|exists:categories,id',
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'phone' => 'required|string|max:255',
+            'address' => 'required|string|max:255',
             'business_id' => 'required|exists:businesses,id',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
         ];
-
-        // if ($this->method() == 'PUT' || $this->method() == 'PATCH') {
-        //     $rules['slug'] = 'required|string|max:255|unique:categories,slug,' . $this->route('id');
-        // }
 
         return $rules;
     }
