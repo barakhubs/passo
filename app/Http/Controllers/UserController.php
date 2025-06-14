@@ -141,8 +141,8 @@ class UserController extends Controller
         ]);
 
         $user = User::where('country_code', $credentials['country_code'])
-                    ->where('phone', $credentials['phone'])
-                    ->first();
+            ->where('phone', $credentials['phone'])
+            ->first();
 
         if (!$user || !Hash::check($credentials['password'], $user->password)) {
             return $this->errorResponse('Invalid credentials', 401);
@@ -258,5 +258,85 @@ class UserController extends Controller
             Log::error('Account deletion error: ' . $e->getMessage());
             return $this->errorResponse('Error deleting account', 500);
         }
+    }
+
+    // ========== Password Reset Methods ==========
+    public function forgotPassword(Request $request)
+    {
+        $validatedData = $request->validate([
+            'phone' => 'required|min:9|max:9',
+            'country_code' => 'required|min:3|max:3'
+        ]);
+
+        $user = User::where([
+            'phone' => $validatedData['phone'],
+            'country_code' => $validatedData['country_code']
+        ])->first();
+
+        if (!$user) {
+            return $this->errorResponse('User not found', 404);
+        }
+
+        // Generate and send OTP
+        $phone = $validatedData['country_code'] . $validatedData['phone'];
+        $this->otpService->generateOtp($phone);
+
+        return $this->successResponse([], 'OTP sent successfully for password reset');
+    }
+
+    public function verifyPasswordResetOtp(Request $request)
+    {
+        $validatedData = $request->validate([
+            'code' => 'required|digits:4',
+            'phone' => 'required|min:9|max:9',
+            'country_code' => 'required|min:3|max:3'
+        ]);
+
+        $isOtpVerified = $this->otpService->isOtpVerified(
+            $validatedData['code'],
+            $validatedData['country_code'],
+            $validatedData['phone']
+        );
+
+        if (!$isOtpVerified) {
+            return $this->errorResponse('Incorrect OTP entered', 401);
+        }
+
+        // You might want to return a temporary token here if you want to secure the reset process further
+        return $this->successResponse([], 'OTP verified successfully');
+    }
+
+    public function resetPassword(Request $request)
+    {
+        $validatedData = $request->validate([
+            'phone' => 'required|min:9|max:9',
+            'country_code' => 'required|min:3|max:3',
+            'password' => [
+                'required',
+                'min:8',
+                function ($attribute, $value, $fail) {
+                    if (!preg_match(self::PASSWORD_REGEX, $value)) {
+                        $fail('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.');
+                    }
+                },
+            ],
+        ]);
+
+        $user = User::where([
+            'phone' => $validatedData['phone'],
+            'country_code' => $validatedData['country_code']
+        ])->first();
+
+        if (!$user) {
+            return $this->errorResponse('User not found', 404);
+        }
+
+        $user->password = Hash::make($validatedData['password']);
+        $user->save();
+
+        // Optional: Invalidate all existing tokens
+        $user->tokens()->delete();
+
+        return $this->successResponse([], 'Password reset successfully');
     }
 }

@@ -27,3 +27,9 @@ Route::post('/register/step/one', [UserController::class, 'registerStepOne']);
 Route::post('/register/verify-otp', action: [UserController::class, 'verifyOTP']);
 Route::post('/register/step/two', action: [UserController::class, 'registerStepTwo']);
 Route::post('/login', [UserController::class, 'login']);
+
+// forgot password
+Route::post('/forgot-password', [UserController::class, 'forgotPassword']);
+Route::post('/reset-password', [UserController::class, 'resetPassword']);
+Route::post('/verify-reset-otp', [UserController::class, 'verifyPasswordResetOtp']);
+
