@@ -23,5 +23,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [UserController::class, 'logout']);
 });
 
-Route::post('/register', [UserController::class, 'register']);
+Route::post('/register/step/one', [UserController::class, 'registerStepOne']);
+Route::post('/register/verify-otp', action: [UserController::class, 'verifyOTP']);
+Route::post('/register/step/two', action: [UserController::class, 'registerStepTwo']);
 Route::post('/login', [UserController::class, 'login']);

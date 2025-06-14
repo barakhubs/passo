@@ -15,15 +15,19 @@ return new class extends Migration
             $table->id();
             $table->string('first_name')->nullable();
             $table->string('last_name')->nullable();
-            $table->string('phone')->nullable()->unique();
-            $table->decimal('verification_code', 6, 0)->nullable();
+            $table->string('phone'); // Removed unique() from here
+            $table->boolean('is_verified')->default(false);
             $table->string('email')->nullable()->unique();
             $table->string('country_code')->nullable();
-            $table->timestamp('email_verified_at')->nullable();
+            $table->timestamp('verified_at')->nullable();
+            $table->enum('status', ['active', 'inactive', 'suspended'])->default('inactive');
             $table->enum('role', ['admin', 'manager'])->default('manager');
-            $table->string('password');
+            $table->string('password')->nullable();
             $table->rememberToken();
             $table->timestamps();
+
+            // Add composite unique index
+            $table->unique(['country_code', 'phone']);
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {

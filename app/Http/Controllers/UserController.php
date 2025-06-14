@@ -5,13 +5,25 @@ namespace App\Http\Controllers;
 use App\Http\Requests\UpdateProfileRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Services\OtpService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
+    private const PASSWORD_REGEX = '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&£#])[A-Za-z\d@$!%*?&£#]{8,}$/';
+
+    private $otpService;
+
+    public function __construct(OtpService $otpService)
+    {
+        $this->otpService = $otpService;
+    }
+
+    // ========== Helper Methods ==========
     private function successResponse($data = [], $message = '', $code = 200)
     {
         return response()->json([
@@ -34,25 +46,83 @@ class UserController extends Controller
         return new UserResource($user);
     }
 
-    public function register(Request $request)
+    // ========== Authentication Methods ==========
+    public function registerStepOne(Request $request)
     {
         $data = $request->validate([
-            'email' => 'required|email|unique:users',
+            'country_code' => 'required',
+            'phone' => [
+                'required',
+                'min:9',
+                'max:10',
+                Rule::unique('users')->where(function ($query) use ($request) {
+                    return $query->where('country_code', $request->country_code);
+                })
+            ],
+        ]);
+
+        User::create([
+            'phone' => $data['phone'],
+            'country_code' => $data['country_code'],
+        ]);
+
+        $phone = $data['country_code'] . $data['phone'];
+        $this->otpService->generateOtp($phone);
+
+        return $this->successResponse([], 'OTP sent to +' . $phone . ' successfully', 201);
+    }
+
+    public function verifyOtp(Request $request)
+    {
+        $validatedData = $request->validate([
+            'code' => 'required|digits:4',
+            'phone' => 'required|min:9|max:9',
+            'country_code' => 'required|min:3|max:3'
+        ]);
+
+        $isOtpVerified = $this->otpService->isOtpVerified(
+            $validatedData['code'],
+            $validatedData['country_code'],
+            $validatedData['phone']
+        );
+
+        if (!$isOtpVerified) {
+            return $this->errorResponse('Incorrect OTP entered', 401);
+        }
+
+        return $this->successResponse(['verified' => true], 'OTP verified successfully');
+    }
+
+    public function registerStepTwo(Request $request)
+    {
+        $validatedData = $request->validate([
             'password' => [
                 'required',
                 'min:8',
                 function ($attribute, $value, $fail) {
-                    if (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&£#])[A-Za-z\d@$!%*?&£#]{8,}$/', $value)) {
+                    if (!preg_match(self::PASSWORD_REGEX, $value)) {
                         $fail('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.');
                     }
                 },
             ],
         ]);
 
-        $user = User::create([
-            'email' => $data['email'],
-            'password' => Hash::make($data['password']),
-        ]);
+        $user = User::where([
+            'phone' => $request['phone'],
+            'country_code' => $request['country_code']
+        ])->first();
+
+        if (!$user) {
+            return $this->errorResponse('User not found', 404);
+        }
+
+        if ($user->status === 'active' || $user->status === 'suspended') {
+            return $this->errorResponse('An error occurred. Please try again', 401);
+        }
+
+        $user->password = Hash::make($validatedData['password']);
+        $user->status = 'active';
+        $user->save();
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -65,11 +135,14 @@ class UserController extends Controller
     public function login(Request $request)
     {
         $credentials = $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
+            'phone' => 'required|min:9|max:9',
+            'country_code' => 'required|min:3|max:3',
+            'password' => 'required|min:8',
         ]);
 
-        $user = User::where('email', $credentials['email'])->first();
+        $user = User::where('country_code', $credentials['country_code'])
+                    ->where('phone', $credentials['phone'])
+                    ->first();
 
         if (!$user || !Hash::check($credentials['password'], $user->password)) {
             return $this->errorResponse('Invalid credentials', 401);
@@ -94,6 +167,59 @@ class UserController extends Controller
         }
     }
 
+    // ========== User Profile Methods ==========
+    public function updateProfile(UpdateProfileRequest $request)
+    {
+        try {
+            $user = Auth::user();
+            $data = $request->validated();
+            $user->update($data);
+
+            return $this->successResponse([
+                'user' => $this->sanitizeUser($user)
+            ], 'Profile updated successfully');
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return $this->errorResponse('User not found', 404);
+        } catch (\Exception $e) {
+            Log::error('Profile update error: ' . $e->getMessage());
+            return $this->errorResponse('Error updating profile', 500);
+        }
+    }
+
+    public function updatePassword(Request $request)
+    {
+        try {
+            $user = $request->user();
+
+            $validatedData = $request->validate([
+                'old_password' => 'required',
+                'new_password' => [
+                    'required',
+                    'min:8',
+                    'different:old_password',
+                    function ($attribute, $value, $fail) {
+                        if (!preg_match(self::PASSWORD_REGEX, $value)) {
+                            $fail('New password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.');
+                        }
+                    },
+                ],
+            ]);
+
+            if (!Hash::check($validatedData['old_password'], $user->password)) {
+                return $this->errorResponse('Current password is incorrect', 401);
+            }
+
+            $user->password = Hash::make($validatedData['new_password']);
+            $user->save();
+
+            return $this->successResponse([], 'Password updated successfully');
+        } catch (\Exception $e) {
+            Log::error('Password update error: ' . $e->getMessage());
+            return $this->errorResponse('Error updating password', 500);
+        }
+    }
+
+    // ========== User Management Methods ==========
     public function allUsers()
     {
         try {
@@ -111,61 +237,6 @@ class UserController extends Controller
         }
     }
 
-    public function updateProfile(UpdateProfileRequest $request)
-{
-    try {
-        $user = Auth::user();
-        $data = $request->validated();
-        $user->update($data);
-
-        return $this->successResponse([
-            'user' => $this->sanitizeUser($user)
-        ], 'Profile updated successfully');
-
-    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-        return $this->errorResponse('User not found', 404);
-    } catch (\Exception $e) {
-        Log::error('Profile update error: ' . $e->getMessage());
-        return $this->errorResponse('Error updating profile', 500);
-    }
-}
-
-
-    public function updatePassword(Request $request)
-    {
-        try {
-            $user = $request->user();
-
-            $validatedData = $request->validate([
-                'old_password' => 'required',
-                'new_password' => [
-                    'required',
-                    'min:8',
-                    'different:old_password',
-                    function ($attribute, $value, $fail) {
-                        if (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&£#])[A-Za-z\d@$!%*?&£#]{8,}$/', $value)) {
-                            $fail('New password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.');
-                        }
-                    },
-                ],
-            ]);
-
-            if (!Hash::check($validatedData['old_password'], $user->password)) {
-                return $this->errorResponse('Current password is incorrect', 401);
-            }
-
-            $user->password = Hash::make($validatedData['new_password']);
-            $user->save();
-
-            return $this->successResponse([], 'Password updated successfully');
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            return $this->errorResponse('User not found', 404);
-        } catch (\Exception $e) {
-            Log::error('Password update error: ' . $e->getMessage());
-            return $this->errorResponse('Error updating password', 500);
-        }
-    }
-
     public function deleteAccount(Request $request)
     {
         try {
@@ -179,12 +250,10 @@ class UserController extends Controller
                 return $this->errorResponse('Invalid credentials', 401);
             }
 
-            $user->tokens()->delete(); // Delete all tokens
+            $user->tokens()->delete();
             $user->delete();
 
             return $this->successResponse([], 'Account deleted successfully');
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            return $this->errorResponse('User not found', 404);
         } catch (\Exception $e) {
             Log::error('Account deletion error: ' . $e->getMessage());
             return $this->errorResponse('Error deleting account', 500);
