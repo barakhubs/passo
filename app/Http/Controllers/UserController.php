@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UpdateProfileRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 
@@ -84,7 +86,7 @@ class UserController extends Controller
     public function logout(Request $request)
     {
         try {
-            $request->user()->currentAccessToken()->delete();
+            $request->user()->tokens()->delete();
             return $this->successResponse([], 'Logout successful');
         } catch (\Exception $e) {
             Log::error('Logout error: ' . $e->getMessage());
@@ -109,28 +111,30 @@ class UserController extends Controller
         }
     }
 
-    public function updateProfile(Request $request, $id)
-    {
-        try {
-            $user = User::findOrFail($id);
+    public function updateProfile(UpdateProfileRequest $request)
+{
+    try {
+        $user = Auth::user();
+        $data = $request->validated();
+        $user->update($data);
 
-            $user->update($request->all());
+        return $this->successResponse([
+            'user' => $this->sanitizeUser($user)
+        ], 'Profile updated successfully');
 
-            return $this->successResponse([
-                'user' => $this->sanitizeUser($user)
-            ], 'Profile updated successfully');
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            return $this->errorResponse('User not found', 404);
-        } catch (\Exception $e) {
-            Log::error('Profile update error: ' . $e->getMessage());
-            return $this->errorResponse('Error updating profile', 500);
-        }
+    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+        return $this->errorResponse('User not found', 404);
+    } catch (\Exception $e) {
+        Log::error('Profile update error: ' . $e->getMessage());
+        return $this->errorResponse('Error updating profile', 500);
     }
+}
 
-    public function updatePassword(Request $request, $id)
+
+    public function updatePassword(Request $request)
     {
         try {
-            $user = User::findOrFail($id);
+            $user = $request->user();
 
             $validatedData = $request->validate([
                 'old_password' => 'required',
@@ -162,10 +166,10 @@ class UserController extends Controller
         }
     }
 
-    public function deleteAccount(Request $request, $id)
+    public function deleteAccount(Request $request)
     {
         try {
-            $user = User::findOrFail($id);
+            $user = $request->user();
 
             $request->validate([
                 'password' => 'required',

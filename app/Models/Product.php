@@ -33,15 +33,10 @@ class Product extends Model
         return $this->belongsTo(Category::class);
     }
 
-    // public function category()
-    // {
-    //     return $this->hasMany(Product::class);
-    // }
-
-    // public function children()
-    // {
-    //     return $this->hasMany(Category::class, 'parent_id');
-    // }
+    public function business()
+    {
+        return $this->belongsTo(Business::class);
+    }
 
     public function getImageUrlAttribute()
     {

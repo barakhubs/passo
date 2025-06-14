@@ -24,7 +24,7 @@ class CategoryRequest extends FormRequest
         $rules = [
             'name' => 'required|string|max:255',
             'parent_id' => 'nullable|exists:categories,id',
-            'business_id' => 'required|exists:businesses,id',
+            'business_id' => 'sometimes|exists:businesses,id',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
         ];
 

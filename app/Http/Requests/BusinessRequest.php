@@ -22,10 +22,10 @@ class BusinessRequest extends FormRequest
     public function rules(): array
     {
         $rules = [
-            'name' => 'required|string|max:255',
-            'user_id' => 'required|exists:users,id',
+            'name' => 'sometimes|string|max:255',
+            'user_id' => 'sometimes|exists:users,id',
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'phone' => 'required|string',
+            'phone' => 'sometimes|string',
             'email' => 'nullable|email',
             'description' => 'nullable|string',
             'category' => 'nullable|string',

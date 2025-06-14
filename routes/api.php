@@ -17,9 +17,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('sales', controller: SaleController::class);
 
     Route::get('/users', [UserController::class, 'allUsers']);
-    Route::patch('/update-profile/{user_id}', [UserController::class, 'updateProfile']);
-    Route::patch('/update-password/{user_id}', [UserController::class, 'updatePassword']);
-    Route::delete('/delete-account/{user_id}', [UserController::class, 'deleteAccount']);
+    Route::patch('/update-profile', [UserController::class, 'updateProfile']);
+    Route::patch('/update-password', [UserController::class, 'updatePassword']);
+    Route::delete('/delete-account', [UserController::class, 'deleteAccount']);
     Route::post('/logout', [UserController::class, 'logout']);
 });
 
