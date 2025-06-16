@@ -6,6 +6,7 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\UserController;
+use App\Services\NLQueryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -32,4 +33,5 @@ Route::post('/login', [UserController::class, 'login']);
 Route::post('/forgot-password', [UserController::class, 'forgotPassword']);
 Route::post('/reset-password', [UserController::class, 'resetPassword']);
 Route::post('/verify-reset-otp', [UserController::class, 'verifyPasswordResetOtp']);
+Route::post('/query-nl', [NLQueryService::class, 'handle']);
 

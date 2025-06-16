@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\UpdateProfileRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Services\NLQueryService;
 use App\Services\OtpService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -338,5 +339,15 @@ class UserController extends Controller
         $user->tokens()->delete();
 
         return $this->successResponse([], 'Password reset successfully');
+    }
+
+    public function testAp(Request $request)
+    {
+        try {
+            $apiService = new NLQueryService();
+        } catch (\Exception $e) {
+            Log::error('Error fetching user profile: ' . $e->getMessage());
+            return $this->errorResponse('Error fetching user profile', 500);
+        }
     }
 }

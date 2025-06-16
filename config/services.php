@@ -34,5 +34,8 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+    'vanna' => [
+        'api_key' => env('VANNA_API_KEY'),
+    ]
 
 ];
