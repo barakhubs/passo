@@ -11,28 +11,6 @@ use Illuminate\Support\Facades\Log;
 
 class NLQueryService
 {
-    private const ALLOWED_SCHEMA = [
-        'customers' => [
-            'first_name',
-            'last_name',
-            'email',
-            'phone',
-            'address',
-            'business_id'
-        ],
-        'orders' => [
-            'order_date',
-            'total_amount',
-            'status'
-        ],
-        'products' => [
-            'name',
-            'description',
-            'price',
-            'stock_quantity'
-        ]
-    ];
-
     public function handle(Request $request)
     {
         $userQuery = $request->input('query');
@@ -79,7 +57,6 @@ class NLQueryService
     {
         try {
             $schemaDescription = $this->getSchemaDescription();
-            $businessId = Business::where('user_id', Auth::user()->id)->first()->id; // Default to 1 if not authenticated
 
             $response = Http::withHeaders([
                 'x-api-key' => env('ANTHROPIC_API_KEY'),
@@ -91,26 +68,53 @@ class NLQueryService
                     'max_tokens' => 1000,
                     'messages' => [[
                         'role' => 'user',
-                        'content' => "Convert this user question to a safe SQL SELECT statement.\n"
+                        'content' => "Convert this user question to a safe PostgreSQL SELECT statement.\n"
                             . "Question: $query\n"
                             . "Tables and fields:\n$schemaDescription\n"
                             . "Rules:\n"
                             . "- Only use SELECT queries\n"
                             . "- Never include any write operations\n"
                             . "- Only use listed tables and fields\n"
-                            . "- the business_id is the tenant filter it is the $businessId\n"
+                            . "- Use PostgreSQL syntax (not MySQL)\n"
+                            . "- For dates use CURRENT_DATE, INTERVAL '7 days', etc.\n"
+                            . "- IMPORTANT: When using SUM() or other numeric functions on total_amount, selling_price, buying_price, unit_price, or total fields, always cast them to NUMERIC first using ::NUMERIC\n"
+                            . "- Example: SUM(total_amount::NUMERIC) instead of SUM(total_amount)\n"
                             . "- Return SQL only, no explanation"
                     ]],
-                    'system' => 'Strictly return only safe SELECT SQL based on provided fields.',
+                    'system' => 'Generate PostgreSQL-compatible SELECT SQL using proper PostgreSQL date functions and syntax. Always cast text-stored numeric fields to NUMERIC type before using in aggregate functions.',
                     'temperature' => 0,
                 ]);
 
+            if (!$response->successful()) {
+                Log::error('Claude API Request Failed', [
+                    'status' => $response->status(),
+                    'body' => $response->body()
+                ]);
+                return null;
+            }
+
             $result = $response->json();
-            $sql = $result['content'][0]['text'] ?? null;
-                Log::error('Claude NL to SQL API sql: ' . $sql);
+
+            if (!isset($result['content'][0]['text'])) {
+                Log::error('Unexpected Claude API Response Format', ['response' => $result]);
+                return null;
+            }
+
+            $sql = trim($result['content'][0]['text']);
+
+            if (empty($sql)) {
+                Log::error('Empty SQL returned from Claude API');
+                return null;
+            }
+
+            Log::info('QL returned from Claude API' . $sql);
+
             return $this->sanitizeSql($sql);
         } catch (\Throwable $e) {
-            Log::error('Claude NL to SQL API Error: ' . $e->getMessage());
+            Log::error('Claude NL to SQL API Error: ' . $e->getMessage(), [
+                'query' => $query,
+                'trace' => $e->getTraceAsString()
+            ]);
             return null;
         }
     }
@@ -151,10 +155,49 @@ class NLQueryService
         }
     }
 
-    private function sanitizeSql(string $sql): string
+    private function sanitizeSql(?string $sql): ?string
     {
+        if ($sql === null || trim($sql) === '') {
+            return null;
+        }
+
         $sql = str_replace('`', '', trim($sql));
+
+        // Auto-fix common type casting issues for numeric operations
+        $sql = $this->addNumericCasting($sql);
+
         return str_ends_with($sql, ';') ? $sql : $sql . ';';
+    }
+
+    private function addNumericCasting(string $sql): string
+    {
+        // Fields that are likely stored as text but used as numbers
+        $numericFields = [
+            'total_amount',
+            'selling_price',
+            'buying_price',
+            'unit_price',
+            'total',
+            'stock_quantity'
+        ];
+
+        foreach ($numericFields as $field) {
+            // Add ::NUMERIC casting when these fields are used in aggregate functions
+            $sql = preg_replace(
+                '/\b(SUM|AVG|MIN|MAX)\s*\(\s*([a-zA-Z_]+\.)?' . $field . '\s*\)/i',
+                '$1($2' . $field . '::NUMERIC)',
+                $sql
+            );
+
+            // Also handle arithmetic operations
+            $sql = preg_replace(
+                '/\b([a-zA-Z_]+\.)?' . $field . '\s*([+\-*\/])/i',
+                '$1' . $field . '::NUMERIC $2',
+                $sql
+            );
+        }
+
+        return $sql;
     }
 
     private function isReadOnlyQuery(string $sql): bool
@@ -221,10 +264,10 @@ class NLQueryService
         return <<<SCHEMA
             - businesses: name, slug, phone, country, description, address, email, website, logo, category, tagline, created_at, updated_at
             - categories: name, slug, image, parent_id, business_id, created_at, updated_at
-            - products: name, slug, image, description, buying_price, selling_price, stock_quantity, published, business_id, category_id, created_at, updated_at
+            - products: name, slug, image, description, buying_price (text), selling_price (text), stock_quantity (text), published, business_id, category_id, created_at, updated_at
             - customers: first_name, last_name, email, phone, address, business_id, created_at, updated_at
-            - sales: business_id, customer_id, reference, payment_status, total_amount, created_at, updated_at
-            - sale_items: sale_id, product_id, quantity, unit_price, total, created_at, updated_at
+            - sales: business_id, customer_id, reference, payment_status, total_amount (text), created_at, updated_at
+            - sale_items: sale_id, product_id, quantity, unit_price (text), total (text), created_at, updated_at
         SCHEMA;
     }
 }
