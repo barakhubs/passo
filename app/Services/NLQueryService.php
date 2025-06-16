@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\Business;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -11,13 +13,23 @@ class NLQueryService
 {
     private const ALLOWED_SCHEMA = [
         'customers' => [
-            'first_name', 'last_name', 'email', 'phone'
+            'first_name',
+            'last_name',
+            'email',
+            'phone',
+            'address',
+            'business_id'
         ],
         'orders' => [
-            'order_date', 'total_amount', 'status'
+            'order_date',
+            'total_amount',
+            'status'
         ],
         'products' => [
-            'name', 'description', 'price', 'stock_quantity'
+            'name',
+            'description',
+            'price',
+            'stock_quantity'
         ]
     ];
 
@@ -25,8 +37,8 @@ class NLQueryService
     {
         $userQuery = $request->input('query');
 
-        if ($this->containsForbiddenTerms($userQuery)) {
-            return response()->json(['error' => 'Only read-only queries are allowed. Please rephrase your question.'], 403);
+        if ($this->looksLikeMaliciousIntent($userQuery)) {
+            return response()->json(['error' => 'Only safe, read-only questions are allowed.'], 403);
         }
 
         try {
@@ -67,33 +79,35 @@ class NLQueryService
     {
         try {
             $schemaDescription = $this->getSchemaDescription();
+            $businessId = Business::where('user_id', Auth::user()->id)->first()->id; // Default to 1 if not authenticated
 
             $response = Http::withHeaders([
                 'x-api-key' => env('ANTHROPIC_API_KEY'),
                 'anthropic-version' => '2023-06-01',
                 'content-type' => 'application/json',
             ])
-            ->post('https://api.anthropic.com/v1/messages', [
-                'model' => 'claude-3-opus-20240229',
-                'max_tokens' => 1000,
-                'messages' => [[
-                    'role' => 'user',
-                    'content' => "Convert this user question to a safe SQL SELECT statement.\n"
-                        . "Question: $query\n"
-                        . "Tables and fields:\n$schemaDescription\n"
-                        . "Rules:\n"
-                        . "- Only use SELECT queries\n"
-                        . "- Never include any write operations\n"
-                        . "- Only use listed tables and fields\n"
-                        . "- Return SQL only, no explanation"
-                ]],
-                'system' => 'Strictly return only safe SELECT SQL based on provided fields.',
-                'temperature' => 0,
-            ]);
+                ->post('https://api.anthropic.com/v1/messages', [
+                    'model' => 'claude-3-opus-20240229',
+                    'max_tokens' => 1000,
+                    'messages' => [[
+                        'role' => 'user',
+                        'content' => "Convert this user question to a safe SQL SELECT statement.\n"
+                            . "Question: $query\n"
+                            . "Tables and fields:\n$schemaDescription\n"
+                            . "Rules:\n"
+                            . "- Only use SELECT queries\n"
+                            . "- Never include any write operations\n"
+                            . "- Only use listed tables and fields\n"
+                            . "- the business_id is the tenant filter it is the $businessId\n"
+                            . "- Return SQL only, no explanation"
+                    ]],
+                    'system' => 'Strictly return only safe SELECT SQL based on provided fields.',
+                    'temperature' => 0,
+                ]);
 
             $result = $response->json();
             $sql = $result['content'][0]['text'] ?? null;
-
+                Log::error('Claude NL to SQL API sql: ' . $sql);
             return $this->sanitizeSql($sql);
         } catch (\Throwable $e) {
             Log::error('Claude NL to SQL API Error: ' . $e->getMessage());
@@ -115,19 +129,19 @@ class NLQueryService
                 'anthropic-version' => '2023-06-01',
                 'content-type' => 'application/json',
             ])
-            ->post('https://api.anthropic.com/v1/messages', [
-                'model' => 'claude-3-sonnet-20240229',
-                'max_tokens' => 1000,
-                'messages' => [[
-                    'role' => 'user',
-                    'content' => "User question: \"$query\"\n"
-                        . "Database results:\n"
-                        . json_encode($formattedResults, JSON_PRETTY_PRINT) . "\n"
-                        . "Please provide a short, simple summary that avoids technical or sensitive terms."
-                ]],
-                'system' => 'Create natural language summaries suitable for non-technical users.',
-                'temperature' => 0.7,
-            ]);
+                ->post('https://api.anthropic.com/v1/messages', [
+                    'model' => 'claude-3-sonnet-20240229',
+                    'max_tokens' => 1000,
+                    'messages' => [[
+                        'role' => 'user',
+                        'content' => "User question: \"$query\"\n"
+                            . "Database results:\n"
+                            . json_encode($formattedResults, JSON_PRETTY_PRINT) . "\n"
+                            . "Please provide a short, simple summary that avoids technical or sensitive terms."
+                    ]],
+                    'system' => 'Create natural language summaries suitable for non-technical users.',
+                    'temperature' => 0.7,
+                ]);
 
             $data = $response->json();
             return trim($data['content'][0]['text'] ?? 'Data was found but no summary could be made.');
@@ -145,41 +159,72 @@ class NLQueryService
 
     private function isReadOnlyQuery(string $sql): bool
     {
-        $sql = strtolower($sql);
+        // Clean and normalize the SQL
+        $sql = trim(strtolower($sql));
 
+        // Remove common SQL comments and extra whitespace
+        $sql = preg_replace('/--.*$/m', '', $sql); // Remove -- comments
+        $sql = preg_replace('/\/\*.*?\*\//s', '', $sql); // Remove /* */ comments
+        $sql = preg_replace('/\s+/', ' ', $sql); // Normalize whitespace
+        $sql = trim($sql);
+
+        // Check forbidden operations
         $forbidden = [
-            'insert', 'update', 'delete', 'drop', 'alter',
-            'create', 'truncate', 'replace', 'grant', 'revoke',
-            'commit', 'rollback'
+            'insert',
+            'update',
+            'delete',
+            'drop',
+            'alter',
+            'create',
+            'truncate',
+            'replace',
+            'grant',
+            'revoke',
+            'commit',
+            'rollback'
         ];
 
         foreach ($forbidden as $word) {
-            if (str_contains($sql, $word)) {
+            if (preg_match('/\b' . $word . '\b/', $sql)) {
                 return false;
             }
         }
 
-        return str_starts_with(trim($sql), 'select');
+        return str_starts_with($sql, 'select');
     }
 
-    private function containsForbiddenTerms(string $input): bool
+    private function looksLikeMaliciousIntent(string $input): bool
     {
-        $input = strtolower($input);
-        $forbidden = ['delete', 'update', 'remove', 'truncate', 'alter', 'insert', 'drop'];
-        foreach ($forbidden as $term) {
-            if (str_contains($input, $term)) {
+        $input = strtolower(preg_replace('/[^a-z\s]/i', '', $input));
+
+        $patterns = [
+            '/\bdrop\b/',
+            '/\btruncate\b/',
+            '/\binsert\b/',
+            '/\bdelete\b/',
+            '/\bupdate\b/',
+            '/--/',
+            '/;/'
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $input)) {
                 return true;
             }
         }
+
         return false;
     }
 
     private function getSchemaDescription(): string
     {
         return <<<SCHEMA
-            - customers: first_name, last_name, email, phone
-            - orders: order_date, total_amount, status
-            - products: name, description, price, stock_quantity
+            - businesses: name, slug, phone, country, description, address, email, website, logo, category, tagline, created_at, updated_at
+            - categories: name, slug, image, parent_id, business_id, created_at, updated_at
+            - products: name, slug, image, description, buying_price, selling_price, stock_quantity, published, business_id, category_id, created_at, updated_at
+            - customers: first_name, last_name, email, phone, address, business_id, created_at, updated_at
+            - sales: business_id, customer_id, reference, payment_status, total_amount, created_at, updated_at
+            - sale_items: sale_id, product_id, quantity, unit_price, total, created_at, updated_at
         SCHEMA;
     }
 }

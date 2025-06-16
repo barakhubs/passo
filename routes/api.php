@@ -22,6 +22,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/update-password', [UserController::class, 'updatePassword']);
     Route::delete('/delete-account', [UserController::class, 'deleteAccount']);
     Route::post('/logout', [UserController::class, 'logout']);
+
+    Route::post('/query-nl', [NLQueryService::class, 'handle']);
 });
 
 Route::post('/register/step/one', [UserController::class, 'registerStepOne']);
@@ -33,5 +35,4 @@ Route::post('/login', [UserController::class, 'login']);
 Route::post('/forgot-password', [UserController::class, 'forgotPassword']);
 Route::post('/reset-password', [UserController::class, 'resetPassword']);
 Route::post('/verify-reset-otp', [UserController::class, 'verifyPasswordResetOtp']);
-Route::post('/query-nl', [NLQueryService::class, 'handle']);
 
