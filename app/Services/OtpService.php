@@ -3,12 +3,15 @@ namespace App\Services;
 
 use App\Models\Otp;
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
 
 class OtpService {
     public function generateOtp($phone, $length = 4) {
         $code = rand(pow(10, $length-1), pow(10, $length)-1);
 
         $this->saveOtp($code, $phone);
+
+        Log::info("Generated OTP: $code for phone: $phone");
 
         return $code;
     }
