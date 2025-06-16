@@ -99,7 +99,7 @@ class NLQueryService
                             . "- Never include any write operations\n"
                             . "- Only use listed tables and fields\n"
                             . "- the business_id is the tenant filter it is the $businessId\n"
-                            . "- Return SQL only, no explanation"
+                            . "- Return SQL only, my DB is Postgres, no explanation"
                     ]],
                     'system' => 'Strictly return only safe SELECT SQL based on provided fields.',
                     'temperature' => 0,
