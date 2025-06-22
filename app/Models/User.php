@@ -27,6 +27,7 @@ class User extends Authenticatable
         'email',
         'role',
         'password',
+        'active_business_id'
     ];
 
     /**
@@ -40,7 +41,7 @@ class User extends Authenticatable
         'verification_code',
         'created_at',
         'updated_at',
-        'email_verified_at'
+        'email_verified_at',
     ];
 
     /**
@@ -57,6 +58,10 @@ class User extends Authenticatable
     }
     public function businesses()
     {
-        return $this->hasMany(Business::class);
+        return $this->hasMany(related: Business::class);
+    }
+
+    public function activeBusiness() {
+        return $this->businesses()->where('id', $this->active_business_id)->first();
     }
 }

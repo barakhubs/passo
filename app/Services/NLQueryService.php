@@ -135,15 +135,22 @@ class NLQueryService
             ])
                 ->post('https://api.anthropic.com/v1/messages', [
                     'model' => 'claude-3-sonnet-20240229',
-                    'max_tokens' => 1000,
+                    'max_tokens' => 1500,
                     'messages' => [[
                         'role' => 'user',
                         'content' => "User question: \"$query\"\n"
                             . "Database results:\n"
                             . json_encode($formattedResults, JSON_PRETTY_PRINT) . "\n"
-                            . "Please provide a short, simple summary that avoids technical or sensitive terms."
+                            . "Please provide a well-formatted response with:\n"
+                            . "1. A brief summary sentence\n"
+                            . "2. Key insights with bullet points or numbers\n"
+                            . "3. Use emojis appropriately (📊 📈 💰 📦 👥 etc.)\n"
+                            . "4. Format numbers nicely (currency, percentages)\n"
+                            . "5. Make it conversational and easy to understand\n"
+                            . "6. If showing lists, use bullet points or numbered lists\n"
+                            . "7. Highlight important metrics or trends"
                     ]],
-                    'system' => 'Create natural language summaries suitable for non-technical users.',
+                    'system' => 'You are a business intelligence assistant. Create well-formatted, engaging summaries with proper structure, emojis, and clear insights. Use markdown-style formatting with bullet points, numbers, and emphasis where appropriate.',
                     'temperature' => 0.7,
                 ]);
 

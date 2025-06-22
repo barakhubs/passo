@@ -73,6 +73,19 @@ class UserController extends Controller
         return $this->successResponse([], 'OTP sent to +' . $phone . ' successfully', 201);
     }
 
+    // resendOtp
+    public function resendOtp(Request $request)
+    {
+        $data = $request->validate([
+            'country_code' => 'required',
+            'phone' => 'required|min:9|max:9',
+        ]);
+
+        $phone = $data['country_code'] . $data['phone'];
+        $this->otpService->resendOtp(phone: $phone);
+        return $this->successResponse([], 'OTP sent to +' . $phone . ' successfully', 201);
+    }
+
     public function verifyOtp(Request $request)
     {
         $validatedData = $request->validate([

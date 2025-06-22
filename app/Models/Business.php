@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
 class Business extends Model
@@ -29,6 +30,11 @@ class Business extends Model
         'created_at',
         'updated_at',
     ];
+
+    public function scopeForCurrentUser($query)
+    {
+        return $query->where('user_id', Auth::id());
+    }
 
     public function products()
     {

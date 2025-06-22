@@ -28,7 +28,7 @@ class BusinessResource extends JsonResource
             'currency' => $this->currency,
             'website' => $this->website,
             'tagline' => $this->tagline,
-            'user' => $this->user,
+            'user' => UserResource::make($this->user),
         ];
     }
 }

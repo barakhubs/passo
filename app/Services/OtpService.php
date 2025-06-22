@@ -6,6 +6,13 @@ use App\Models\User;
 use Illuminate\Support\Facades\Log;
 
 class OtpService {
+
+    private $furahaSmsService;
+
+    public function __construct(FurahaSmsService $furahaSmsService) {
+        $this->furahaSmsService = $furahaSmsService;
+    }
+
     public function generateOtp($phone, $length = 4) {
         $code = rand(pow(10, $length-1), pow(10, $length)-1);
 
@@ -16,11 +23,25 @@ class OtpService {
         return $code;
     }
 
+    // resend opt
+    public function resendOtp($phone, $length = 4) {
+        $otp = Otp::where('phone', $phone)->latest()->first();
+
+        if ($otp) {
+            $code = rand(pow(10, $length-1), pow(10, $length)-1);
+            $otp->update(['code' => $code]);
+            Log::info("Generated OTP: $code for phone: $phone");
+            // $this->furahaSmsService->sendOtp($phone, $otp->code,  '');
+        }
+    }
+
     private function saveOtp($code, $phone) {
         Otp::create([
             'code' => $code,
             'phone' => $phone,
         ]);
+
+        // $this->furahaSmsService->sendOtp($phone, $code,  '');
     }
 
     public function isOtpVerified($code, $countryCode, $phoneNumber) {
