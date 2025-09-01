@@ -27,7 +27,9 @@ class User extends Authenticatable
         'email',
         'role',
         'password',
-        'active_business_id'
+        'active_business_id',
+        'status',
+        'is_verified'
     ];
 
     /**
@@ -61,7 +63,8 @@ class User extends Authenticatable
         return $this->hasMany(related: Business::class);
     }
 
-    public function activeBusiness() {
+    public function activeBusiness()
+    {
         return $this->businesses()->where('id', $this->active_business_id)->first();
     }
 }
