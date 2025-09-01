@@ -47,21 +47,57 @@ class UserController extends Controller
         return new UserResource($user);
     }
 
+    /**
+     * Clean up incomplete registrations older than 24 hours
+     * Call this periodically or before new registrations
+     */
+    private function cleanupIncompleteRegistrations()
+    {
+        try {
+            User::where('password', null)
+                ->where('status', 'inactive')
+                ->where('created_at', '<', now()->subHours(24))
+                ->delete();
+        } catch (\Exception $e) {
+            Log::warning('Failed to cleanup incomplete registrations: ' . $e->getMessage());
+        }
+    }
+
     // ========== Authentication Methods ==========
     public function registerStepOne(Request $request)
     {
+        // Clean up old incomplete registrations
+        $this->cleanupIncompleteRegistrations();
+
         $data = $request->validate([
             'country_code' => 'required',
-            'phone' => [
-                'required',
-                'min:9',
-                'max:10',
-                Rule::unique('users')->where(function ($query) use ($request) {
-                    return $query->where('country_code', $request->country_code);
-                })
-            ],
+            'phone' => 'required|min:9|max:10',
         ]);
 
+        // Check if user already exists
+        $existingUser = User::where([
+            'country_code' => $data['country_code'],
+            'phone' => $data['phone']
+        ])->first();
+
+        if ($existingUser) {
+            // If user has a password set, they should use password reset instead
+            if (!is_null($existingUser->password)) {
+                return $this->errorResponse(
+                    'This phone number is already registered. Please use "Forgot Password" to reset your password instead of creating a new account.',
+                    409
+                );
+            }
+
+            // If user exists but has no password, allow them to continue registration
+            // This handles incomplete registrations
+            $phone = $data['country_code'] . $data['phone'];
+            $this->otpService->generateOtp($phone);
+
+            return $this->successResponse([], 'OTP sent to ' . $phone . ' successfully. Continuing previous registration.', 201);
+        }
+
+        // Create new user for first-time registration
         User::create([
             'phone' => $data['phone'],
             'country_code' => $data['country_code'],
@@ -70,7 +106,7 @@ class UserController extends Controller
         $phone = $data['country_code'] . $data['phone'];
         $this->otpService->generateOtp($phone);
 
-        return $this->successResponse([], 'OTP sent to +' . $phone . ' successfully', 201);
+        return $this->successResponse([], 'OTP sent to ' . $phone . ' successfully', 201);
     }
 
     // resendOtp
@@ -83,7 +119,7 @@ class UserController extends Controller
 
         $phone = $data['country_code'] . $data['phone'];
         $this->otpService->resendOtp(phone: $phone);
-        return $this->successResponse([], 'OTP sent to +' . $phone . ' successfully', 201);
+        return $this->successResponse([], 'OTP sent to ' . $phone . ' successfully', 201);
     }
 
     public function verifyOtp(Request $request)
@@ -110,6 +146,8 @@ class UserController extends Controller
     public function registerStepTwo(Request $request)
     {
         $validatedData = $request->validate([
+            'phone' => 'required|min:9|max:10',
+            'country_code' => 'required',
             'password' => [
                 'required',
                 'min:8',
@@ -122,12 +160,20 @@ class UserController extends Controller
         ]);
 
         $user = User::where([
-            'phone' => $request['phone'],
-            'country_code' => $request['country_code']
+            'phone' => $validatedData['phone'],
+            'country_code' => $validatedData['country_code']
         ])->first();
 
         if (!$user) {
-            return $this->errorResponse('User not found', 404);
+            return $this->errorResponse('User not found. Please start registration from step one.', 404);
+        }
+
+        // Check if user already has a password set (complete registration)
+        if (!is_null($user->password)) {
+            return $this->errorResponse(
+                'This phone number is already registered with a password. Please use "Forgot Password" to reset your password or login directly.',
+                409
+            );
         }
 
         if ($user->status === 'active' || $user->status === 'suspended') {
@@ -288,7 +334,15 @@ class UserController extends Controller
         ])->first();
 
         if (!$user) {
-            return $this->errorResponse('User not found', 404);
+            return $this->errorResponse('No account found with this phone number. Please register first.', 404);
+        }
+
+        // Check if user has completed registration (has password)
+        if (is_null($user->password)) {
+            return $this->errorResponse(
+                'Your registration is incomplete. Please complete your registration instead of resetting password.',
+                400
+            );
         }
 
         // Generate and send OTP
