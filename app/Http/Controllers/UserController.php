@@ -15,7 +15,7 @@ use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
-    private const PASSWORD_REGEX = '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&£#])[A-Za-z\d@$!%*?&£#]{8,}$/';
+    private const PASSWORD_REGEX = '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s])/u';
 
     private $otpService;
 
