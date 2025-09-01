@@ -1,20 +1,25 @@
 <?php
+
 namespace App\Services;
 
 use App\Models\Otp;
 use App\Models\User;
+use App\Services\SmsService;
 use Illuminate\Support\Facades\Log;
 
-class OtpService {
+class OtpService
+{
 
-    private $furahaSmsService;
+    private $smsService;
 
-    public function __construct(FurahaSmsService $furahaSmsService) {
-        $this->furahaSmsService = $furahaSmsService;
+    public function __construct(SmsService $smsService)
+    {
+        $this->smsService = $smsService;
     }
 
-    public function generateOtp($phone, $length = 4) {
-        $code = rand(pow(10, $length-1), pow(10, $length)-1);
+    public function generateOtp($phone, $length = 4)
+    {
+        $code = rand(pow(10, $length - 1), pow(10, $length) - 1);
 
         $this->saveOtp($code, $phone);
 
@@ -23,28 +28,65 @@ class OtpService {
         return $code;
     }
 
-    // resend opt
-    public function resendOtp($phone, $length = 4) {
+    // resend otp
+    public function resendOtp($phone, $length = 4)
+    {
         $otp = Otp::where('phone', $phone)->latest()->first();
 
         if ($otp) {
-            $code = rand(pow(10, $length-1), pow(10, $length)-1);
+            $code = rand(pow(10, $length - 1), pow(10, $length) - 1);
             $otp->update(['code' => $code]);
-            Log::info("Generated OTP: $code for phone: $phone");
-            // $this->furahaSmsService->sendOtp($phone, $otp->code,  '');
+            Log::info("Resending OTP: $code for phone: $phone");
+            $this->sendOtpSms($phone, $code);
         }
     }
 
-    private function saveOtp($code, $phone) {
+    private function saveOtp($code, $phone)
+    {
         Otp::create([
             'code' => $code,
             'phone' => $phone,
         ]);
 
-        // $this->furahaSmsService->sendOtp($phone, $code,  '');
+        $this->sendOtpSms($phone, $code);
     }
 
-    public function isOtpVerified($code, $countryCode, $phoneNumber) {
+    /**
+     * Send OTP SMS using the configured SMS service
+     *
+     * @param string $phone
+     * @param string $code
+     * @return void
+     */
+    private function sendOtpSms($phone, $code)
+    {
+        $appName = config('app.name', 'Passo');
+        $message = "Your {$appName} verification code is: {$code}. Do not share this code with anyone.";
+
+        // Send using EgoSMS only (no fallback)
+        $result = $this->smsService->sendSms(
+            $phone,
+            $message,
+            ['priority' => 0] // High priority for OTP
+        );
+
+        if (!$result['success']) {
+            Log::error('Failed to send OTP SMS', [
+                'phone' => $phone,
+                'code' => $code,
+                'error' => $result['message']
+            ]);
+        } else {
+            Log::info('OTP SMS sent successfully', [
+                'phone' => $phone,
+                'provider' => $result['provider'] ?? 'ego',
+                'used_fallback' => $result['used_fallback'] ?? false
+            ]);
+        }
+    }
+
+    public function isOtpVerified($code, $countryCode, $phoneNumber)
+    {
         $otpRecord = Otp::where('code', $code)->where('phone', $countryCode . $phoneNumber)->where('is_expired', false)->first();
 
         if ($otpRecord) {
@@ -53,7 +95,7 @@ class OtpService {
 
             User::where('country_code', $countryCode)
                 ->where('phone', $phoneNumber)
-                ->update( ['is_verified' => true, 'verified_at' => now()]);
+                ->update(['is_verified' => true, 'verified_at' => now()]);
 
             return true;
         } else {
@@ -61,7 +103,18 @@ class OtpService {
         }
     }
 
-    public function sendOtp($otp, $phone) {
+    /**
+     * Send custom OTP (for external use)
+     *
+     * @param string $otp
+     * @param string $phone
+     * @return array
+     */
+    public function sendOtp($otp, $phone)
+    {
+        $appName = config('app.name', 'Passo');
+        $message = "Your {$appName} verification code is: {$otp}. Do not share this code with anyone.";
 
+        return $this->smsService->sendSms($phone, $message, ['priority' => 0]);
     }
 }
