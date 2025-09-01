@@ -5,24 +5,28 @@ This document describes the pagination implementation for products with mobile p
 ## Endpoints
 
 ### 1. Get Products (Paginated by Default)
+
 **GET** `/api/products`
 
 Returns paginated products by default. This is optimized for mobile applications with pull-to-refresh functionality.
 
 **Query Parameters:**
-- `page` (optional): Page number (default: 1, minimum: 1)
-- `per_page` (optional): Items per page (default: 15, range: 1-100)
-- `all` (optional): Set to "true" to get all products without pagination
+
+-   `page` (optional): Page number (default: 1, minimum: 1)
+-   `per_page` (optional): Items per page (default: 15, range: 1-100)
+-   `all` (optional): Set to "true" to get all products without pagination
 
 **Examples:**
+
 ```
 GET /api/products                    # Page 1, 15 items
-GET /api/products?page=2             # Page 2, 15 items  
+GET /api/products?page=2             # Page 2, 15 items
 GET /api/products?page=1&per_page=20 # Page 1, 20 items
 GET /api/products?all=true           # All products (no pagination)
 ```
 
 **Paginated Response:**
+
 ```json
 {
     "message": "Products retrieved successfully",
@@ -56,6 +60,7 @@ GET /api/products?all=true           # All products (no pagination)
 ```
 
 **All Products Response (when using ?all=true):**
+
 ```json
 [
     {
@@ -75,6 +80,7 @@ GET /api/products?all=true           # All products (no pagination)
 ```
 
 **Empty Response:**
+
 ```json
 {
     "message": "No products found",
@@ -96,6 +102,7 @@ GET /api/products?all=true           # All products (no pagination)
 ### Pull-to-Refresh Implementation
 
 #### Android (Kotlin/Java)
+
 ```kotlin
 // SwipeRefreshLayout implementation
 swipeRefreshLayout.setOnRefreshListener {
@@ -108,13 +115,13 @@ swipeRefreshLayout.setOnRefreshListener {
 recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
     override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
         super.onScrolled(recyclerView, dx, dy)
-        
+
         val layoutManager = recyclerView.layoutManager as LinearLayoutManager
         val visibleItemCount = layoutManager.childCount
         val totalItemCount = layoutManager.itemCount
         val firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition()
-        
-        if (!isLoading && hasMorePages && 
+
+        if (!isLoading && hasMorePages &&
             (visibleItemCount + firstVisibleItemPosition) >= totalItemCount - 3) {
             loadProducts(page = currentPage + 1, isRefresh = false)
         }
@@ -127,31 +134,31 @@ fun loadProducts(page: Int, isRefresh: Boolean = false) {
     } else {
         isLoading = true
     }
-    
+
     apiService.getProducts(page = page, perPage = 15)
         .enqueue(object : Callback<ProductResponse> {
             override fun onResponse(call: Call<ProductResponse>, response: Response<ProductResponse>) {
                 if (response.isSuccessful) {
                     val productResponse = response.body()
-                    
+
                     if (isRefresh) {
                         productsList.clear()
                         currentPage = 1
                     }
-                    
+
                     productResponse?.data?.let { products ->
                         productsList.addAll(products)
                         adapter.notifyDataSetChanged()
                     }
-                    
+
                     hasMorePages = productResponse?.pagination?.has_more_pages ?: false
                     if (!isRefresh) currentPage++
                 }
-                
+
                 swipeRefreshLayout.isRefreshing = false
                 isLoading = false
             }
-            
+
             override fun onFailure(call: Call<ProductResponse>, t: Throwable) {
                 swipeRefreshLayout.isRefreshing = false
                 isLoading = false
@@ -161,6 +168,7 @@ fun loadProducts(page: Int, isRefresh: Boolean = false) {
 ```
 
 #### iOS (Swift)
+
 ```swift
 // UIRefreshControl implementation
 let refreshControl = UIRefreshControl()
@@ -178,7 +186,7 @@ func scrollViewDidScroll(_ scrollView: UIScrollView) {
     let offsetY = scrollView.contentOffset.y
     let contentHeight = scrollView.contentSize.height
     let height = scrollView.frame.size.height
-    
+
     if offsetY > contentHeight - height * 1.5 && !isLoading && hasMorePages {
         loadProducts(page: currentPage + 1)
     }
@@ -188,7 +196,7 @@ func loadProducts(page: Int, isRefresh: Bool = false) {
     if !isRefresh {
         isLoading = true
     }
-    
+
     APIService.shared.getProducts(page: page, perPage: 15) { [weak self] result in
         DispatchQueue.main.async {
             switch result {
@@ -197,20 +205,20 @@ func loadProducts(page: Int, isRefresh: Bool = false) {
                     self?.products.removeAll()
                     self?.currentPage = 1
                 }
-                
+
                 self?.products.append(contentsOf: response.data)
                 self?.hasMorePages = response.pagination.hasMorePages
-                
+
                 if !isRefresh {
                     self?.currentPage += 1
                 }
-                
+
                 self?.tableView.reloadData()
-                
+
             case .failure(let error):
                 print("Error loading products: \(error)")
             }
-            
+
             self?.refreshControl.endRefreshing()
             self?.isLoading = false
         }
@@ -219,9 +227,10 @@ func loadProducts(page: Int, isRefresh: Bool = false) {
 ```
 
 #### React Native
+
 ```javascript
-import React, { useState, useEffect } from 'react';
-import { FlatList, RefreshControl } from 'react-native';
+import React, { useState, useEffect } from "react";
+import { FlatList, RefreshControl } from "react-native";
 
 const ProductList = () => {
     const [products, setProducts] = useState([]);
@@ -242,8 +251,8 @@ const ProductList = () => {
                 `${API_BASE_URL}/products?page=${page}&per_page=15`,
                 {
                     headers: {
-                        'Authorization': `Bearer ${authToken}`,
-                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${authToken}`,
+                        "Content-Type": "application/json",
                     },
                 }
             );
@@ -254,14 +263,13 @@ const ProductList = () => {
                 setProducts(data.data);
                 setCurrentPage(1);
             } else {
-                setProducts(prev => [...prev, ...data.data]);
+                setProducts((prev) => [...prev, ...data.data]);
             }
 
             setHasMorePages(data.pagination.has_more_pages);
             if (!isRefresh) setCurrentPage(page);
-
         } catch (error) {
-            console.error('Error loading products:', error);
+            console.error("Error loading products:", error);
         } finally {
             setIsLoading(false);
             setIsRefreshing(false);
@@ -295,7 +303,9 @@ const ProductList = () => {
             }
             onEndReached={handleLoadMore}
             onEndReachedThreshold={0.1}
-            ListFooterComponent={isLoading && !isRefreshing ? <LoadingSpinner /> : null}
+            ListFooterComponent={
+                isLoading && !isRefreshing ? <LoadingSpinner /> : null
+            }
         />
     );
 };
@@ -304,25 +314,29 @@ const ProductList = () => {
 ## Features
 
 ### 1. **Performance Optimized**
-- Default 15 items per page for mobile optimization
-- Maximum 100 items per page to prevent memory issues
-- Ordered by creation date (newest first)
+
+-   Default 15 items per page for mobile optimization
+-   Maximum 100 items per page to prevent memory issues
+-   Ordered by creation date (newest first)
 
 ### 2. **Mobile-Friendly Response**
-- `has_more_pages`: Boolean to easily check if more data exists
-- `current_page` and `last_page` for progress indicators
-- `total` count for showing "X of Y" indicators
-- `next_page_url` and `prev_page_url` for easy navigation
+
+-   `has_more_pages`: Boolean to easily check if more data exists
+-   `current_page` and `last_page` for progress indicators
+-   `total` count for showing "X of Y" indicators
+-   `next_page_url` and `prev_page_url` for easy navigation
 
 ### 3. **Error Handling**
-- Graceful handling of invalid page numbers
-- Consistent error response format
-- Automatic parameter validation and sanitization
+
+-   Graceful handling of invalid page numbers
+-   Consistent error response format
+-   Automatic parameter validation and sanitization
 
 ### 4. **Backward Compatibility**
-- Pagination is now the default behavior for better performance
-- Use `?all=true` parameter to get all products without pagination if needed
-- Consistent endpoint (`/api/products`) with smart behavior based on parameters
+
+-   Pagination is now the default behavior for better performance
+-   Use `?all=true` parameter to get all products without pagination if needed
+-   Consistent endpoint (`/api/products`) with smart behavior based on parameters
 
 ## Authentication
 
@@ -352,7 +366,7 @@ For better performance, consider implementing Redis caching:
 public function getPaginatedProducts($perPage = 15, $page = 1)
 {
     $cacheKey = "products_page_{$page}_per_{$perPage}";
-    
+
     return Cache::remember($cacheKey, 300, function () use ($perPage, $page) {
         return $this->model->orderBy('created_at', 'desc')
                           ->paginate($perPage, ['*'], 'page', $page);

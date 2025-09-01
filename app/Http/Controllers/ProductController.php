@@ -24,17 +24,17 @@ class ProductController extends Controller
             if ($request->has('all') && $request->get('all') === 'true') {
                 return $this->getAllProducts();
             }
-            
+
             // Default to pagination
             $perPage = $request->get('per_page', 15);
             $page = $request->get('page', 1);
-            
+
             // Validate pagination parameters
             $perPage = min(max((int)$perPage, 1), 100); // Between 1 and 100
             $page = max((int)$page, 1); // At least 1
-            
+
             $paginatedProducts = $this->productRepository->getPaginatedProducts($perPage, $page);
-            
+
             if ($paginatedProducts->total() === 0) {
                 return response()->json([
                     'message' => 'No products found',
@@ -91,7 +91,7 @@ class ProductController extends Controller
         }
     }
 
-    public function show ($id)
+    public function show($id)
     {
         try {
             $product = $this->productRepository->getProductById($id);
@@ -108,7 +108,7 @@ class ProductController extends Controller
         }
     }
 
-    public function store (ProductRequest $productRequest)
+    public function store(ProductRequest $productRequest)
     {
         try {
             Log::info($productRequest->validated());
@@ -130,7 +130,7 @@ class ProductController extends Controller
         }
     }
 
-    public function update (ProductRequest $productRequest, $productId)
+    public function update(ProductRequest $productRequest, $productId)
     {
         try {
             $product = $this->productRepository->getProductById($productId);
@@ -156,7 +156,7 @@ class ProductController extends Controller
         }
     }
 
-    public function destroy ($productId)
+    public function destroy($productId)
     {
         try {
             $product = $this->productRepository->getProductById($productId);
@@ -172,7 +172,5 @@ class ProductController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
-
     }
-
 }
