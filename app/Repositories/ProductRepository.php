@@ -25,6 +25,11 @@ class ProductRepository implements ProductRepositoryInterface
         return $this->model->all();
     }
 
+    public function getPaginatedProducts($perPage = 15, $page = 1)
+    {
+        return $this->model->orderBy('created_at', 'desc')->paginate($perPage, ['*'], 'page', $page);
+    }
+
     public function getProductById($id)
     {
         return $this->model->find($id);
