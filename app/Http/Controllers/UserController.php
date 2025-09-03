@@ -280,7 +280,57 @@ class UserController extends Controller
     }
 
     // ========== User Management Methods ==========
-    public function allUsers()
+    public function allUsers(Request $request)
+    {
+        try {
+            // Check if user explicitly wants all users (non-paginated)
+            if ($request->has('all') && $request->get('all') === 'true') {
+                return $this->getAllUsers();
+            }
+            
+            // Default to pagination
+            [$perPage, $page] = $this->getPaginationParams($request);
+            
+            $paginatedUsers = User::orderBy('created_at', 'desc')->paginate($perPage, ['*'], 'page', $page);
+            
+            if ($paginatedUsers->total() === 0) {
+                return response()->json([
+                    'message' => 'No users found',
+                    'data' => [],
+                    'pagination' => [
+                        'current_page' => $page,
+                        'per_page' => $perPage,
+                        'total' => 0,
+                        'last_page' => 1,
+                        'has_more_pages' => false,
+                        'from' => null,
+                        'to' => null
+                    ]
+                ], 200);
+            }
+
+            return response()->json([
+                'message' => 'Users retrieved successfully',
+                'data' => collect($paginatedUsers->items())->map(fn($user) => $this->sanitizeUser($user)),
+                'pagination' => [
+                    'current_page' => $paginatedUsers->currentPage(),
+                    'per_page' => $paginatedUsers->perPage(),
+                    'total' => $paginatedUsers->total(),
+                    'last_page' => $paginatedUsers->lastPage(),
+                    'has_more_pages' => $paginatedUsers->hasMorePages(),
+                    'from' => $paginatedUsers->firstItem(),
+                    'to' => $paginatedUsers->lastItem(),
+                    'next_page_url' => $paginatedUsers->nextPageUrl(),
+                    'prev_page_url' => $paginatedUsers->previousPageUrl()
+                ]
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Error fetching users: ' . $e->getMessage());
+            return $this->errorResponse('Error fetching users', 500);
+        }
+    }
+
+    public function getAllUsers()
     {
         try {
             $users = User::all();

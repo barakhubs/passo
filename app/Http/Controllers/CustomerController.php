@@ -17,7 +17,29 @@ class CustomerController extends Controller
         $this->customerRepository = $customerRepository;
     }
 
-    public function index ()
+    public function index(Request $request)
+    {
+        try {
+            // Check if user explicitly wants all customers (non-paginated)
+            if ($request->has('all') && $request->get('all') === 'true') {
+                return $this->getAllCustomers();
+            }
+            
+            // Default to pagination
+            [$perPage, $page] = $this->getPaginationParams($request);
+            
+            $paginatedCustomers = $this->customerRepository->getPaginatedCustomers($perPage, $page);
+            
+            return $this->paginatedResponse($paginatedCustomers, CustomerResource::class, 'Customers retrieved successfully');
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => 'An error occurred while retrieving the customers',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function getAllCustomers()
     {
         try {
             $customers = $this->customerRepository->getAllCustomers();

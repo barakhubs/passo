@@ -26,6 +26,11 @@ class BusinessRepository implements BusinessRepositoryInterface
         return $this->model->forCurrentUser()->get();
     }
 
+    public function getPaginatedBusinesses($perPage = 15, $page = 1)
+    {
+        return $this->model->forCurrentUser()->orderBy('created_at', 'desc')->paginate($perPage, ['*'], 'page', $page);
+    }
+
     public function getBusinessById($id)
     {
         return $this->model->forCurrentUser()->find($id);

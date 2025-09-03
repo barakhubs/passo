@@ -16,7 +16,29 @@ class CategoryController extends Controller
         $this->categoryRepository = $categoryRepositoryInterface;
     }
 
-    public function index ()
+    public function index(Request $request)
+    {
+        try {
+            // Check if user explicitly wants all categories (non-paginated)
+            if ($request->has('all') && $request->get('all') === 'true') {
+                return $this->getAllCategories();
+            }
+            
+            // Default to pagination
+            [$perPage, $page] = $this->getPaginationParams($request);
+            
+            $paginatedCategories = $this->categoryRepository->getPaginatedCategories($perPage, $page);
+            
+            return $this->paginatedResponse($paginatedCategories, CategoryResource::class, 'Categories retrieved successfully');
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => 'An error occurred while retrieving the categories',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function getAllCategories()
     {
         try {
             $categories = $this->categoryRepository->getAllCategories();
@@ -27,11 +49,10 @@ class CategoryController extends Controller
             return CategoryResource::collection($categories);
         } catch (\Throwable $th) {
             return response()->json([
-                'message' => 'An error occurred while retrieving the category',
+                'message' => 'An error occurred while retrieving the categories',
                 'error' => $th->getMessage(),
             ], 500);
         }
-
     }
 
     public function show ($categoryId)

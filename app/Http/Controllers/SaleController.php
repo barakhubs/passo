@@ -17,7 +17,29 @@ class SaleController extends Controller
         $this->saleRepository = $saleRepository;
     }
 
-    public function index ()
+    public function index(Request $request)
+    {
+        try {
+            // Check if user explicitly wants all sales (non-paginated)
+            if ($request->has('all') && $request->get('all') === 'true') {
+                return $this->getAllSales();
+            }
+            
+            // Default to pagination
+            [$perPage, $page] = $this->getPaginationParams($request);
+            
+            $paginatedSales = $this->saleRepository->getPaginatedSales($perPage, $page);
+            
+            return $this->paginatedResponse($paginatedSales, SaleResource::class, 'Sales retrieved successfully');
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => 'An error occurred while retrieving the sales',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function getAllSales()
     {
         try {
             $sales = $this->saleRepository->getAllSales();

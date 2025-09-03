@@ -24,6 +24,11 @@ class CategoryRepository implements CategoryRepositoryInterface
         return $this->model->all();
     }
 
+    public function getPaginatedCategories($perPage = 15, $page = 1)
+    {
+        return $this->model->orderBy('created_at', 'desc')->paginate($perPage, ['*'], 'page', $page);
+    }
+
     public function getCategoryById($id)
     {
         return $this->model->find($id);

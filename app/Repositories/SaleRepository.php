@@ -19,6 +19,11 @@ class SaleRepository implements SaleRepositoryInterface
         return $this->model->all();
     }
 
+    public function getPaginatedSales($perPage = 15, $page = 1)
+    {
+        return $this->model->orderBy('created_at', 'desc')->paginate($perPage, ['*'], 'page', $page);
+    }
+
     public function getSaleById($id)
     {
         return $this->model->find($id);

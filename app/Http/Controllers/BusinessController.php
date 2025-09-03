@@ -16,7 +16,29 @@ class BusinessController extends Controller
         $this->businessRepository = $businessRepositoryInterface;
     }
 
-    public function index ()
+    public function index(Request $request)
+    {
+        try {
+            // Check if user explicitly wants all businesses (non-paginated)
+            if ($request->has('all') && $request->get('all') === 'true') {
+                return $this->getAllBusinesses();
+            }
+            
+            // Default to pagination
+            [$perPage, $page] = $this->getPaginationParams($request);
+            
+            $paginatedBusinesses = $this->businessRepository->getPaginatedBusinesses($perPage, $page);
+            
+            return $this->paginatedResponse($paginatedBusinesses, BusinessResource::class, 'Businesses retrieved successfully');
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => 'An error occurred while retrieving the businesses',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function getAllBusinesses()
     {
         try {
             $businesses = $this->businessRepository->getAllBusinesses();
@@ -27,11 +49,10 @@ class BusinessController extends Controller
             return BusinessResource::collection($businesses);
         } catch (\Throwable $th) {
             return response()->json([
-                'message' => 'An error occurred while retrieving the business',
+                'message' => 'An error occurred while retrieving the businesses',
                 'error' => $th->getMessage(),
             ], 500);
         }
-
     }
 
     public function show ($businessId)
