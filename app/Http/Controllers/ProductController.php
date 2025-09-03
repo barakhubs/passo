@@ -24,12 +24,12 @@ class ProductController extends Controller
             if ($request->has('all') && $request->get('all') === 'true') {
                 return $this->getAllProducts();
             }
-            
+
             // Default to pagination
             [$perPage, $page] = $this->getPaginationParams($request);
-            
+
             $paginatedProducts = $this->productRepository->getPaginatedProducts($perPage, $page);
-            
+
             return $this->paginatedResponse($paginatedProducts, ProductResource::class, 'Products retrieved successfully');
         } catch (\Throwable $th) {
             return response()->json([
@@ -37,7 +37,8 @@ class ProductController extends Controller
                 'error' => $th->getMessage(),
             ], 500);
         }
-    }    public function getAllProducts()
+    }
+    public function getAllProducts()
     {
         try {
             $products = $this->productRepository->getAllProducts();

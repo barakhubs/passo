@@ -6,27 +6,30 @@ This document describes the pagination implementation across all listing endpoin
 
 All listing endpoints now support pagination by default for better performance and mobile optimization:
 
-- **Products**: `/api/products`
-- **Categories**: `/api/categories` 
-- **Customers**: `/api/customers`
-- **Businesses**: `/api/businesses`
-- **Sales**: `/api/sales`
-- **Users**: `/api/users`
+-   **Products**: `/api/products`
+-   **Categories**: `/api/categories`
+-   **Customers**: `/api/customers`
+-   **Businesses**: `/api/businesses`
+-   **Sales**: `/api/sales`
+-   **Users**: `/api/users`
 
 ## Endpoint Behavior
 
 ### Default (Paginated Response)
+
 All listing endpoints return paginated results by default.
 
 **Query Parameters:**
-- `page` (optional): Page number (default: 1, minimum: 1)
-- `per_page` (optional): Items per page (default: 15, range: 1-100)
-- `all` (optional): Set to "true" to get all items without pagination
+
+-   `page` (optional): Page number (default: 1, minimum: 1)
+-   `per_page` (optional): Items per page (default: 15, range: 1-100)
+-   `all` (optional): Set to "true" to get all items without pagination
 
 **Examples:**
+
 ```
 GET /api/products                    # Page 1, 15 items
-GET /api/products?page=2             # Page 2, 15 items  
+GET /api/products?page=2             # Page 2, 15 items
 GET /api/products?page=1&per_page=20 # Page 1, 20 items
 GET /api/products?all=true           # All products (no pagination)
 
@@ -36,6 +39,7 @@ GET /api/sales?page=1&per_page=5       # Page 1, 5 sales
 ```
 
 ### Paginated Response Format
+
 All paginated endpoints return the same consistent format:
 
 ```json
@@ -44,7 +48,7 @@ All paginated endpoints return the same consistent format:
     "data": [
         {
             "id": 1,
-            "name": "Item Name",
+            "name": "Item Name"
             // ... other item properties
         }
     ],
@@ -63,19 +67,21 @@ All paginated endpoints return the same consistent format:
 ```
 
 ### Non-Paginated Response Format
+
 When using `?all=true`, endpoints return the original format:
 
 ```json
 [
     {
         "id": 1,
-        "name": "Item Name",
+        "name": "Item Name"
         // ... other item properties
     }
 ]
 ```
 
 ### Empty Response Format
+
 When no data is found:
 
 ```json
@@ -99,6 +105,7 @@ When no data is found:
 ### Pull-to-Refresh Implementation
 
 #### Android (Kotlin/Java)
+
 ```kotlin
 // SwipeRefreshLayout implementation
 swipeRefreshLayout.setOnRefreshListener {
@@ -111,13 +118,13 @@ swipeRefreshLayout.setOnRefreshListener {
 recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
     override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
         super.onScrolled(recyclerView, dx, dy)
-        
+
         val layoutManager = recyclerView.layoutManager as LinearLayoutManager
         val visibleItemCount = layoutManager.childCount
         val totalItemCount = layoutManager.itemCount
         val firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition()
-        
-        if (!isLoading && hasMorePages && 
+
+        if (!isLoading && hasMorePages &&
             (visibleItemCount + firstVisibleItemPosition) >= totalItemCount - 3) {
             loadData(endpoint = currentEndpoint, page = currentPage + 1, isRefresh = false)
         }
@@ -130,31 +137,31 @@ fun loadData(endpoint: String, page: Int, isRefresh: Boolean = false) {
     } else {
         isLoading = true
     }
-    
+
     apiService.getData(endpoint = endpoint, page = page, perPage = 15)
         .enqueue(object : Callback<ApiResponse> {
             override fun onResponse(call: Call<ApiResponse>, response: Response<ApiResponse>) {
                 if (response.isSuccessful) {
                     val apiResponse = response.body()
-                    
+
                     if (isRefresh) {
                         itemsList.clear()
                         currentPage = 1
                     }
-                    
+
                     apiResponse?.data?.let { items ->
                         itemsList.addAll(items)
                         adapter.notifyDataSetChanged()
                     }
-                    
+
                     hasMorePages = apiResponse?.pagination?.has_more_pages ?: false
                     if (!isRefresh) currentPage++
                 }
-                
+
                 swipeRefreshLayout.isRefreshing = false
                 isLoading = false
             }
-            
+
             override fun onFailure(call: Call<ApiResponse>, t: Throwable) {
                 swipeRefreshLayout.isRefreshing = false
                 isLoading = false
@@ -164,6 +171,7 @@ fun loadData(endpoint: String, page: Int, isRefresh: Boolean = false) {
 ```
 
 #### iOS (Swift)
+
 ```swift
 // UIRefreshControl implementation
 let refreshControl = UIRefreshControl()
@@ -181,7 +189,7 @@ func scrollViewDidScroll(_ scrollView: UIScrollView) {
     let offsetY = scrollView.contentOffset.y
     let contentHeight = scrollView.contentSize.height
     let height = scrollView.frame.size.height
-    
+
     if offsetY > contentHeight - height * 1.5 && !isLoading && hasMorePages {
         loadData(endpoint: currentEndpoint, page: currentPage + 1)
     }
@@ -191,7 +199,7 @@ func loadData(endpoint: String, page: Int, isRefresh: Bool = false) {
     if !isRefresh {
         isLoading = true
     }
-    
+
     APIService.shared.getData(endpoint: endpoint, page: page, perPage: 15) { [weak self] result in
         DispatchQueue.main.async {
             switch result {
@@ -200,20 +208,20 @@ func loadData(endpoint: String, page: Int, isRefresh: Bool = false) {
                     self?.items.removeAll()
                     self?.currentPage = 1
                 }
-                
+
                 self?.items.append(contentsOf: response.data)
                 self?.hasMorePages = response.pagination.hasMorePages
-                
+
                 if !isRefresh {
                     self?.currentPage += 1
                 }
-                
+
                 self?.tableView.reloadData()
-                
+
             case .failure(let error):
                 print("Error loading data: \(error)")
             }
-            
+
             self?.refreshControl.endRefreshing()
             self?.isLoading = false
         }
@@ -222,9 +230,10 @@ func loadData(endpoint: String, page: Int, isRefresh: Bool = false) {
 ```
 
 #### React Native
+
 ```javascript
-import React, { useState, useEffect } from 'react';
-import { FlatList, RefreshControl } from 'react-native';
+import React, { useState, useEffect } from "react";
+import { FlatList, RefreshControl } from "react-native";
 
 const DataList = ({ endpoint }) => {
     const [items, setItems] = useState([]);
@@ -245,8 +254,8 @@ const DataList = ({ endpoint }) => {
                 `${API_BASE_URL}/${endpoint}?page=${page}&per_page=15`,
                 {
                     headers: {
-                        'Authorization': `Bearer ${authToken}`,
-                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${authToken}`,
+                        "Content-Type": "application/json",
                     },
                 }
             );
@@ -257,14 +266,13 @@ const DataList = ({ endpoint }) => {
                 setItems(data.data);
                 setCurrentPage(1);
             } else {
-                setItems(prev => [...prev, ...data.data]);
+                setItems((prev) => [...prev, ...data.data]);
             }
 
             setHasMorePages(data.pagination.has_more_pages);
             if (!isRefresh) setCurrentPage(page);
-
         } catch (error) {
-            console.error('Error loading data:', error);
+            console.error("Error loading data:", error);
         } finally {
             setIsLoading(false);
             setIsRefreshing(false);
@@ -298,7 +306,9 @@ const DataList = ({ endpoint }) => {
             }
             onEndReached={handleLoadMore}
             onEndReachedThreshold={0.1}
-            ListFooterComponent={isLoading && !isRefreshing ? <LoadingSpinner /> : null}
+            ListFooterComponent={
+                isLoading && !isRefreshing ? <LoadingSpinner /> : null
+            }
         />
     );
 };
@@ -307,30 +317,35 @@ const DataList = ({ endpoint }) => {
 ## Features
 
 ### 1. **Consistent API Design**
-- All listing endpoints follow the same pagination pattern
-- Uniform response format across all endpoints
-- Same query parameters for all endpoints
+
+-   All listing endpoints follow the same pagination pattern
+-   Uniform response format across all endpoints
+-   Same query parameters for all endpoints
 
 ### 2. **Performance Optimized**
-- Default 15 items per page for mobile optimization
-- Maximum 100 items per page to prevent memory issues
-- Ordered by creation date (newest first) for all endpoints
+
+-   Default 15 items per page for mobile optimization
+-   Maximum 100 items per page to prevent memory issues
+-   Ordered by creation date (newest first) for all endpoints
 
 ### 3. **Mobile-Friendly Response**
-- `has_more_pages`: Boolean to easily check if more data exists
-- `current_page` and `last_page` for progress indicators
-- `total` count for showing "X of Y" indicators
-- `next_page_url` and `prev_page_url` for easy navigation
+
+-   `has_more_pages`: Boolean to easily check if more data exists
+-   `current_page` and `last_page` for progress indicators
+-   `total` count for showing "X of Y" indicators
+-   `next_page_url` and `prev_page_url` for easy navigation
 
 ### 4. **Backward Compatibility**
-- Pagination is now the default behavior for better performance
-- Use `?all=true` parameter to get all items without pagination if needed
-- Consistent endpoint URLs with smart behavior based on parameters
+
+-   Pagination is now the default behavior for better performance
+-   Use `?all=true` parameter to get all items without pagination if needed
+-   Consistent endpoint URLs with smart behavior based on parameters
 
 ### 5. **Developer Experience**
-- Centralized pagination logic in base Controller class
-- Consistent validation and error handling
-- Easy to extend to new endpoints
+
+-   Centralized pagination logic in base Controller class
+-   Consistent validation and error handling
+-   Easy to extend to new endpoints
 
 ## Authentication
 
@@ -342,14 +357,14 @@ Authorization: Bearer {your-token}
 
 ## API Endpoints Reference
 
-| Endpoint | Resource | Description |
-|----------|----------|-------------|
-| `GET /api/products` | Products | List all products (paginated) |
+| Endpoint              | Resource   | Description                     |
+| --------------------- | ---------- | ------------------------------- |
+| `GET /api/products`   | Products   | List all products (paginated)   |
 | `GET /api/categories` | Categories | List all categories (paginated) |
-| `GET /api/customers` | Customers | List all customers (paginated) |
+| `GET /api/customers`  | Customers  | List all customers (paginated)  |
 | `GET /api/businesses` | Businesses | List all businesses (paginated) |
-| `GET /api/sales` | Sales | List all sales (paginated) |
-| `GET /api/users` | Users | List all users (paginated) |
+| `GET /api/sales`      | Sales      | List all sales (paginated)      |
+| `GET /api/users`      | Users      | List all users (paginated)      |
 
 ## Error Handling
 
@@ -384,7 +399,7 @@ For better performance, consider implementing Redis caching:
 public function getPaginatedItems($perPage = 15, $page = 1)
 {
     $cacheKey = "items_page_{$page}_per_{$perPage}";
-    
+
     return Cache::remember($cacheKey, 300, function () use ($perPage, $page) {
         return $this->model->orderBy('created_at', 'desc')
                           ->paginate($perPage, ['*'], 'page', $page);

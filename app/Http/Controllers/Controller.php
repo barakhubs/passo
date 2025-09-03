@@ -49,11 +49,11 @@ abstract class Controller
     {
         $perPage = $request->get('per_page', $defaultPerPage);
         $page = $request->get('page', 1);
-        
+
         // Validate pagination parameters
         $perPage = min(max((int)$perPage, 1), 100); // Between 1 and 100
         $page = max((int)$page, 1); // At least 1
-        
+
         return [$perPage, $page];
     }
 }

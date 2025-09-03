@@ -24,12 +24,12 @@ class SaleController extends Controller
             if ($request->has('all') && $request->get('all') === 'true') {
                 return $this->getAllSales();
             }
-            
+
             // Default to pagination
             [$perPage, $page] = $this->getPaginationParams($request);
-            
+
             $paginatedSales = $this->saleRepository->getPaginatedSales($perPage, $page);
-            
+
             return $this->paginatedResponse($paginatedSales, SaleResource::class, 'Sales retrieved successfully');
         } catch (\Throwable $th) {
             return response()->json([
@@ -56,7 +56,7 @@ class SaleController extends Controller
         }
     }
 
-    public function show ($id)
+    public function show($id)
     {
         try {
             $sale = $this->saleRepository->getSaleById($id);
@@ -73,7 +73,7 @@ class SaleController extends Controller
         }
     }
 
-    public function store (SaleRequest $saleRequest)
+    public function store(SaleRequest $saleRequest)
     {
         try {
             $sale = $this->saleRepository->createSale($saleRequest->validated());
@@ -94,7 +94,7 @@ class SaleController extends Controller
         }
     }
 
-    public function update (SaleRequest $saleRequest, $saleId)
+    public function update(SaleRequest $saleRequest, $saleId)
     {
         try {
             $sale = $this->saleRepository->getSaleById($saleId);
@@ -120,7 +120,7 @@ class SaleController extends Controller
         }
     }
 
-    public function destroy ($saleId)
+    public function destroy($saleId)
     {
         try {
             $sale = $this->saleRepository->getSaleById($saleId);
@@ -136,7 +136,5 @@ class SaleController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
-
     }
-
 }

@@ -287,12 +287,12 @@ class UserController extends Controller
             if ($request->has('all') && $request->get('all') === 'true') {
                 return $this->getAllUsers();
             }
-            
+
             // Default to pagination
             [$perPage, $page] = $this->getPaginationParams($request);
-            
+
             $paginatedUsers = User::orderBy('created_at', 'desc')->paginate($perPage, ['*'], 'page', $page);
-            
+
             if ($paginatedUsers->total() === 0) {
                 return response()->json([
                     'message' => 'No users found',

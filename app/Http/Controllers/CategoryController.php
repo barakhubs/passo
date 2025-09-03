@@ -23,12 +23,12 @@ class CategoryController extends Controller
             if ($request->has('all') && $request->get('all') === 'true') {
                 return $this->getAllCategories();
             }
-            
+
             // Default to pagination
             [$perPage, $page] = $this->getPaginationParams($request);
-            
+
             $paginatedCategories = $this->categoryRepository->getPaginatedCategories($perPage, $page);
-            
+
             return $this->paginatedResponse($paginatedCategories, CategoryResource::class, 'Categories retrieved successfully');
         } catch (\Throwable $th) {
             return response()->json([
@@ -55,7 +55,7 @@ class CategoryController extends Controller
         }
     }
 
-    public function show ($categoryId)
+    public function show($categoryId)
     {
         try {
             $category = $this->categoryRepository->getCategoryById($categoryId);
@@ -71,14 +71,14 @@ class CategoryController extends Controller
         }
     }
 
-    public function store (CategoryRequest $categoryRequest)
+    public function store(CategoryRequest $categoryRequest)
     {
         try {
             $category = $this->categoryRepository->createCategory($categoryRequest->validated());
             return (new CategoryResource($category))
-                    ->additional(['message' => 'Category created successfully'])
-                    ->response()
-                    ->setStatusCode(201);
+                ->additional(['message' => 'Category created successfully'])
+                ->response()
+                ->setStatusCode(201);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'message' => 'Validation failed',
@@ -90,10 +90,9 @@ class CategoryController extends Controller
                 'error' => $th->getMessage(),
             ], 500);
         }
-
     }
 
-    public function update (CategoryRequest $categoryRequest, $categoryId)
+    public function update(CategoryRequest $categoryRequest, $categoryId)
     {
         try {
             $category = $this->categoryRepository->getCategoryById($categoryId);
@@ -118,7 +117,7 @@ class CategoryController extends Controller
         }
     }
 
-    public function destroy ($categoryId)
+    public function destroy($categoryId)
     {
         try {
             $category = $this->categoryRepository->getCategoryById($categoryId);
@@ -134,6 +133,5 @@ class CategoryController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
-
     }
 }

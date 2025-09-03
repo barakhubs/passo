@@ -24,12 +24,12 @@ class CustomerController extends Controller
             if ($request->has('all') && $request->get('all') === 'true') {
                 return $this->getAllCustomers();
             }
-            
+
             // Default to pagination
             [$perPage, $page] = $this->getPaginationParams($request);
-            
+
             $paginatedCustomers = $this->customerRepository->getPaginatedCustomers($perPage, $page);
-            
+
             return $this->paginatedResponse($paginatedCustomers, CustomerResource::class, 'Customers retrieved successfully');
         } catch (\Throwable $th) {
             return response()->json([
@@ -56,7 +56,7 @@ class CustomerController extends Controller
         }
     }
 
-    public function show ($id)
+    public function show($id)
     {
         try {
             $customer = $this->customerRepository->getCustomerById($id);
@@ -73,7 +73,7 @@ class CustomerController extends Controller
         }
     }
 
-    public function store (CustomerRequest $customerRequest)
+    public function store(CustomerRequest $customerRequest)
     {
         try {
             $customer = $this->customerRepository->createCustomer($customerRequest->validated());
@@ -94,7 +94,7 @@ class CustomerController extends Controller
         }
     }
 
-    public function update (CustomerRequest $customerRequest, $customerId)
+    public function update(CustomerRequest $customerRequest, $customerId)
     {
         try {
             $customer = $this->customerRepository->getCustomerById($customerId);
@@ -120,7 +120,7 @@ class CustomerController extends Controller
         }
     }
 
-    public function destroy ($customerId)
+    public function destroy($customerId)
     {
         try {
             $customer = $this->customerRepository->getCustomerById($customerId);
@@ -136,7 +136,5 @@ class CustomerController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
-
     }
-
 }

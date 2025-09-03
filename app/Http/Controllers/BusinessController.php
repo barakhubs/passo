@@ -23,12 +23,12 @@ class BusinessController extends Controller
             if ($request->has('all') && $request->get('all') === 'true') {
                 return $this->getAllBusinesses();
             }
-            
+
             // Default to pagination
             [$perPage, $page] = $this->getPaginationParams($request);
-            
+
             $paginatedBusinesses = $this->businessRepository->getPaginatedBusinesses($perPage, $page);
-            
+
             return $this->paginatedResponse($paginatedBusinesses, BusinessResource::class, 'Businesses retrieved successfully');
         } catch (\Throwable $th) {
             return response()->json([
@@ -55,7 +55,7 @@ class BusinessController extends Controller
         }
     }
 
-    public function show ($businessId)
+    public function show($businessId)
     {
         try {
             $business = $this->businessRepository->getBusinessById($businessId);
@@ -71,14 +71,14 @@ class BusinessController extends Controller
         }
     }
 
-    public function store (BusinessRequest $businessRequest)
+    public function store(BusinessRequest $businessRequest)
     {
         try {
             $business = $this->businessRepository->createBusiness($businessRequest->validated());
             return (new BusinessResource($business))
-                    ->additional(['message' => 'Business created successfully'])
-                    ->response()
-                    ->setStatusCode(201);
+                ->additional(['message' => 'Business created successfully'])
+                ->response()
+                ->setStatusCode(201);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'message' => 'Validation failed',
@@ -90,10 +90,9 @@ class BusinessController extends Controller
                 'error' => $th->getMessage(),
             ], 500);
         }
-
     }
 
-    public function update (BusinessRequest $businessRequest, $businessId)
+    public function update(BusinessRequest $businessRequest, $businessId)
     {
         try {
             $business = $this->businessRepository->getBusinessById($businessId);
@@ -118,7 +117,7 @@ class BusinessController extends Controller
         }
     }
 
-    public function destroy ($businessId)
+    public function destroy($businessId)
     {
         try {
             $business = $this->businessRepository->getBusinessById($businessId);
@@ -134,6 +133,5 @@ class BusinessController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
-
     }
 }
