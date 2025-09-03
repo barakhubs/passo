@@ -23,7 +23,6 @@ class BusinessRequest extends FormRequest
     {
         $rules = [
             'name' => 'sometimes|string|max:255',
-            'user_id' => 'sometimes|exists:users,id',
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
             'phone' => 'sometimes|string',
             'email' => 'nullable|email',
