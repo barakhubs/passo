@@ -378,12 +378,27 @@ class UserController extends Controller
             'country_code' => 'required|min:3|max:3'
         ]);
 
+        $phone = $validatedData['country_code'] . $validatedData['phone'];
+
+        // Rate limiting: Check if too many requests from this phone
+        $rateLimitKey = "forgot_password_attempts_{$phone}";
+        $attempts = cache()->get($rateLimitKey, 0);
+
+        if ($attempts >= 10) {
+            $remainingTime = cache()->get("{$rateLimitKey}_expires", 0);
+            $minutesLeft = max(0, ceil(($remainingTime - time()) / 60));
+            return $this->errorResponse("Too many password reset attempts. Please try again in {$minutesLeft} minutes.", 429);
+        }
+
         $user = User::where([
             'phone' => $validatedData['phone'],
             'country_code' => $validatedData['country_code']
         ])->first();
 
         if (!$user) {
+            // Increment attempts even for non-existent users to prevent enumeration
+            cache()->put($rateLimitKey, $attempts + 1, 900); // 15 minutes
+            cache()->put("{$rateLimitKey}_expires", time() + 900, 900);
             return $this->errorResponse('No account found with this phone number. Please register first.', 404);
         }
 
@@ -395,8 +410,11 @@ class UserController extends Controller
             );
         }
 
+        // Increment rate limit counter
+        cache()->put($rateLimitKey, $attempts + 1, 900); // 15 minutes
+        cache()->put("{$rateLimitKey}_expires", time() + 900, 900);
+
         // Generate and send OTP
-        $phone = $validatedData['country_code'] . $validatedData['phone'];
         $this->otpService->generateOtp($phone);
 
         return $this->successResponse([], 'OTP sent successfully for password reset');
@@ -420,8 +438,22 @@ class UserController extends Controller
             return $this->errorResponse('Incorrect OTP entered', 401);
         }
 
-        // You might want to return a temporary token here if you want to secure the reset process further
-        return $this->successResponse([], 'OTP verified successfully');
+        // Generate a temporary reset token valid for 15 minutes
+        $resetToken = bin2hex(random_bytes(32));
+        $phone = $validatedData['country_code'] . $validatedData['phone'];
+
+        // Store the reset token in cache with expiration
+        cache()->put("password_reset_{$phone}", [
+            'token' => $resetToken,
+            'expires_at' => now()->addMinutes(15),
+            'phone' => $validatedData['phone'],
+            'country_code' => $validatedData['country_code']
+        ], 900); // 15 minutes in seconds
+
+        return $this->successResponse([
+            'reset_token' => $resetToken,
+            'expires_in' => 900 // 15 minutes in seconds
+        ], 'OTP verified successfully. You can now reset your password.');
     }
 
     public function resetPassword(Request $request)
@@ -429,6 +461,7 @@ class UserController extends Controller
         $validatedData = $request->validate([
             'phone' => 'required|min:9|max:9',
             'country_code' => 'required|min:3|max:3',
+            'reset_token' => 'required|string|min:64|max:64',
             'password' => [
                 'required',
                 'min:8',
@@ -440,22 +473,49 @@ class UserController extends Controller
             ],
         ]);
 
+        $phone = $validatedData['country_code'] . $validatedData['phone'];
+        $resetData = cache()->get("password_reset_{$phone}");
+
+        // Verify reset token exists and is valid
+        if (!$resetData) {
+            return $this->errorResponse('Invalid or expired reset token. Please start the password reset process again.', 401);
+        }
+
+        // Verify token matches
+        if ($resetData['token'] !== $validatedData['reset_token']) {
+            return $this->errorResponse('Invalid reset token. Please start the password reset process again.', 401);
+        }
+
+        // Verify token hasn't expired
+        if (now()->gt($resetData['expires_at'])) {
+            cache()->forget("password_reset_{$phone}");
+            return $this->errorResponse('Reset token has expired. Please start the password reset process again.', 401);
+        }
+
+        // Verify phone and country code match
+        if ($resetData['phone'] !== $validatedData['phone'] || $resetData['country_code'] !== $validatedData['country_code']) {
+            return $this->errorResponse('Invalid reset token. Please start the password reset process again.', 401);
+        }
+
         $user = User::where([
             'phone' => $validatedData['phone'],
             'country_code' => $validatedData['country_code']
         ])->first();
 
         if (!$user) {
+            cache()->forget("password_reset_{$phone}");
             return $this->errorResponse('User not found', 404);
         }
 
+        // Update password
         $user->password = Hash::make($validatedData['password']);
         $user->save();
 
-        // Optional: Invalidate all existing tokens
+        // Clean up: Remove reset token and invalidate all existing user tokens
+        cache()->forget("password_reset_{$phone}");
         $user->tokens()->delete();
 
-        return $this->successResponse([], 'Password reset successfully');
+        return $this->successResponse([], 'Password reset successfully. Please login with your new password.');
     }
 
     public function testAp(Request $request)

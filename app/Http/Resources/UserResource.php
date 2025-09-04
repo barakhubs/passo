@@ -23,6 +23,7 @@ class UserResource extends JsonResource
             'phone' => $this->phone,
             'role' => $this->role,
             'active_business' => $this->activeBusiness(),
+            'products' => ProductResource::collection($this->whenLoaded('products'))
         ];
     }
 }
